@@ -1,9 +1,8 @@
 import os
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from migrations import run_migrations
 from supabase_client import get_supabase_client, masked_key
-from app.routers import matches, reveal, locations, verification, messages, discovery, blocks, reports, swipe, notifications, premium, admin, webhooks, interests, profile, recommendations, gdpr, rewind, photos
+from app.routers import matches, reveal, locations, verification, messages, discovery, blocks, reports, swipe, notifications, premium, admin, webhooks, interests, profile, recommendations, gdpr, rewind, photos, auth
 from app.middleware.rate_limiter import rate_limit_middleware
 from app.middleware.analytics_middleware import analytics_middleware
 from app.services.jobs import start_background_jobs, stop_background_jobs
@@ -24,7 +23,6 @@ app.middleware("http")(rate_limit_middleware)
 
 @app.on_event("startup")
 async def startup():
-	run_migrations()
 	await init_redis()
 	
 	fcm_path = os.getenv("FCM_CREDENTIALS_PATH")
@@ -42,6 +40,7 @@ async def shutdown():
 
 app.include_router(matches.router)
 app.include_router(reveal.router)
+app.include_router(auth.router)
 app.include_router(locations.router)
 app.include_router(verification.router)
 app.include_router(messages.router)

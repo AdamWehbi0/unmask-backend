@@ -1,10 +1,12 @@
-from supabase_client import get_supabase_client
+-- Unmask Dating App Database Schema
+-- Copy and paste into Supabase SQL Editor
 
-SCHEMA = [
-    """
-    CREATE TABLE IF NOT EXISTS users (
+-- Migration 1/27
+CREATE TABLE IF NOT EXISTS users (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         email TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        name TEXT,
         bio TEXT,
         height_cm INT,
         gender TEXT CHECK (gender IN ('male', 'female', 'non_binary', 'prefer_not_to_say')),
@@ -28,10 +30,10 @@ SCHEMA = [
         deleted_at TIMESTAMP NULL,
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
-    );
-    """,
-    """
-    CREATE TABLE IF NOT EXISTS matches (
+    );;
+
+-- Migration 2/27
+CREATE TABLE IF NOT EXISTS matches (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user1 UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
         user2 UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
@@ -43,10 +45,10 @@ SCHEMA = [
         updated_at TIMESTAMP DEFAULT NOW(),
         UNIQUE(user1, user2),
         CHECK (user1 != user2)
-    );
-    """,
-    """
-    CREATE TABLE IF NOT EXISTS messages (
+    );;
+
+-- Migration 3/27
+CREATE TABLE IF NOT EXISTS messages (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         match_id UUID NOT NULL REFERENCES matches(id) ON DELETE RESTRICT,
         sender_id UUID NOT NULL REFERENCES users(id) ON DELETE SET NULL,
@@ -57,10 +59,10 @@ SCHEMA = [
     );
     CREATE INDEX IF NOT EXISTS idx_messages_match_id ON messages(match_id);
     CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(match_id, created_at DESC);
-    CREATE INDEX IF NOT EXISTS idx_messages_is_read ON messages(match_id, is_read) WHERE is_read = FALSE;
-    """,
-    """
-    CREATE TABLE IF NOT EXISTS user_locations (
+    CREATE INDEX IF NOT EXISTS idx_messages_is_read ON messages(match_id, is_read) WHERE is_read = FALSE;;
+
+-- Migration 4/27
+CREATE TABLE IF NOT EXISTS user_locations (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
         latitude DECIMAL(10, 8) NOT NULL,
@@ -69,10 +71,10 @@ SCHEMA = [
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
     );
-    CREATE INDEX IF NOT EXISTS idx_user_locations_coordinates ON user_locations(latitude, longitude);
-    """,
-    """
-    CREATE TABLE IF NOT EXISTS user_verifications (
+    CREATE INDEX IF NOT EXISTS idx_user_locations_coordinates ON user_locations(latitude, longitude);;
+
+-- Migration 5/27
+CREATE TABLE IF NOT EXISTS user_verifications (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
         storage_path TEXT,
@@ -85,10 +87,10 @@ SCHEMA = [
         updated_at TIMESTAMP DEFAULT NOW()
     );
     CREATE INDEX IF NOT EXISTS idx_user_verifications_user_id ON user_verifications(user_id);
-    CREATE INDEX IF NOT EXISTS idx_user_verifications_status ON user_verifications(status);
-    """,
-    """
-    CREATE TABLE IF NOT EXISTS user_blocks (
+    CREATE INDEX IF NOT EXISTS idx_user_verifications_status ON user_verifications(status);;
+
+-- Migration 6/27
+CREATE TABLE IF NOT EXISTS user_blocks (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         blocker_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         blocked_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -98,10 +100,10 @@ SCHEMA = [
         CHECK (blocker_id != blocked_id)
     );
     CREATE INDEX IF NOT EXISTS idx_user_blocks_blocker ON user_blocks(blocker_id) WHERE deleted_at IS NULL;
-    CREATE INDEX IF NOT EXISTS idx_user_blocks_blocked ON user_blocks(blocked_id) WHERE deleted_at IS NULL;
-    """,
-    """
-    CREATE TABLE IF NOT EXISTS abuse_reports (
+    CREATE INDEX IF NOT EXISTS idx_user_blocks_blocked ON user_blocks(blocked_id) WHERE deleted_at IS NULL;;
+
+-- Migration 7/27
+CREATE TABLE IF NOT EXISTS abuse_reports (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         reporter_id UUID NOT NULL REFERENCES users(id) ON DELETE SET NULL,
         reported_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -116,10 +118,10 @@ SCHEMA = [
     );
     CREATE INDEX IF NOT EXISTS idx_abuse_reports_status ON abuse_reports(status) WHERE deleted_at IS NULL;
     CREATE INDEX IF NOT EXISTS idx_abuse_reports_reported ON abuse_reports(reported_id) WHERE deleted_at IS NULL;
-    CREATE INDEX IF NOT EXISTS idx_abuse_reports_created ON abuse_reports(created_at DESC) WHERE deleted_at IS NULL;
-    """,
-    """
-    CREATE TABLE IF NOT EXISTS user_actions (
+    CREATE INDEX IF NOT EXISTS idx_abuse_reports_created ON abuse_reports(created_at DESC) WHERE deleted_at IS NULL;;
+
+-- Migration 8/27
+CREATE TABLE IF NOT EXISTS user_actions (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         action_type TEXT CHECK (action_type IN ('like', 'pass', 'undo')) NOT NULL,
@@ -131,10 +133,10 @@ SCHEMA = [
     );
     CREATE INDEX IF NOT EXISTS idx_user_actions_user ON user_actions(user_id, created_at DESC) WHERE deleted_at IS NULL;
     CREATE INDEX IF NOT EXISTS idx_user_actions_target ON user_actions(target_user_id) WHERE deleted_at IS NULL;
-    CREATE INDEX IF NOT EXISTS idx_user_actions_type ON user_actions(user_id, action_type, created_at DESC) WHERE deleted_at IS NULL;
-    """,
-    """
-    CREATE TABLE IF NOT EXISTS user_subscriptions (
+    CREATE INDEX IF NOT EXISTS idx_user_actions_type ON user_actions(user_id, action_type, created_at DESC) WHERE deleted_at IS NULL;;
+
+-- Migration 9/27
+CREATE TABLE IF NOT EXISTS user_subscriptions (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
         plan TEXT CHECK (plan IN ('free', 'premium', 'vip')) DEFAULT 'free',
@@ -150,10 +152,10 @@ SCHEMA = [
         updated_at TIMESTAMP DEFAULT NOW()
     );
     CREATE INDEX IF NOT EXISTS idx_user_subscriptions_plan ON user_subscriptions(plan);
-    CREATE INDEX IF NOT EXISTS idx_user_subscriptions_expires ON user_subscriptions(expires_at) WHERE expires_at IS NOT NULL;
-    """,
-    """
-    CREATE TABLE IF NOT EXISTS analytics_events (
+    CREATE INDEX IF NOT EXISTS idx_user_subscriptions_expires ON user_subscriptions(expires_at) WHERE expires_at IS NOT NULL;;
+
+-- Migration 10/27
+CREATE TABLE IF NOT EXISTS analytics_events (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id UUID REFERENCES users(id) ON DELETE SET NULL,
         event_type TEXT NOT NULL,
@@ -163,10 +165,10 @@ SCHEMA = [
     CREATE INDEX IF NOT EXISTS idx_analytics_events_user ON analytics_events(user_id);
     CREATE INDEX IF NOT EXISTS idx_analytics_events_type ON analytics_events(event_type);
     CREATE INDEX IF NOT EXISTS idx_analytics_events_created ON analytics_events(created_at DESC);
-    CREATE INDEX IF NOT EXISTS idx_analytics_events_user_type ON analytics_events(user_id, event_type, created_at DESC);
-    """,
-    """
-    CREATE TABLE IF NOT EXISTS notification_tokens (
+    CREATE INDEX IF NOT EXISTS idx_analytics_events_user_type ON analytics_events(user_id, event_type, created_at DESC);;
+
+-- Migration 11/27
+CREATE TABLE IF NOT EXISTS notification_tokens (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         device_token TEXT NOT NULL,
@@ -176,10 +178,10 @@ SCHEMA = [
         updated_at TIMESTAMP DEFAULT NOW()
     );
     CREATE UNIQUE INDEX IF NOT EXISTS idx_notification_tokens_device ON notification_tokens(user_id, device_token) WHERE deleted_at IS NULL;
-    CREATE INDEX IF NOT EXISTS idx_notification_tokens_user ON notification_tokens(user_id) WHERE deleted_at IS NULL;
-    """,
-    """
-    CREATE TABLE IF NOT EXISTS notifications_sent (
+    CREATE INDEX IF NOT EXISTS idx_notification_tokens_user ON notification_tokens(user_id) WHERE deleted_at IS NULL;;
+
+-- Migration 12/27
+CREATE TABLE IF NOT EXISTS notifications_sent (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         recipient_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         notification_type TEXT NOT NULL,
@@ -191,10 +193,10 @@ SCHEMA = [
         created_at TIMESTAMP DEFAULT NOW()
     );
     CREATE INDEX IF NOT EXISTS idx_notifications_sent_recipient ON notifications_sent(recipient_id);
-    CREATE INDEX IF NOT EXISTS idx_notifications_sent_status ON notifications_sent(is_sent, created_at DESC);
-    """,
-    """
-    CREATE TABLE IF NOT EXISTS audit_logs (
+    CREATE INDEX IF NOT EXISTS idx_notifications_sent_status ON notifications_sent(is_sent, created_at DESC);;
+
+-- Migration 13/27
+CREATE TABLE IF NOT EXISTS audit_logs (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         admin_id UUID NOT NULL REFERENCES users(id) ON DELETE SET NULL,
         action TEXT NOT NULL,
@@ -204,10 +206,10 @@ SCHEMA = [
     );
     CREATE INDEX IF NOT EXISTS idx_audit_logs_admin ON audit_logs(admin_id, created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action, created_at DESC);
-    CREATE INDEX IF NOT EXISTS idx_audit_logs_target ON audit_logs(target_user_id, created_at DESC);
-    """,
-    """
-    CREATE TABLE IF NOT EXISTS interest_categories (
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_target ON audit_logs(target_user_id, created_at DESC);;
+
+-- Migration 14/27
+CREATE TABLE IF NOT EXISTS interest_categories (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         name TEXT UNIQUE NOT NULL,
         category TEXT NOT NULL,
@@ -215,10 +217,10 @@ SCHEMA = [
         created_at TIMESTAMP DEFAULT NOW()
     );
     CREATE INDEX IF NOT EXISTS idx_interest_categories_name ON interest_categories(name);
-    CREATE INDEX IF NOT EXISTS idx_interest_categories_category ON interest_categories(category);
-    """,
-    """
-    CREATE TABLE IF NOT EXISTS user_interests (
+    CREATE INDEX IF NOT EXISTS idx_interest_categories_category ON interest_categories(category);;
+
+-- Migration 15/27
+CREATE TABLE IF NOT EXISTS user_interests (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         interest_id UUID NOT NULL REFERENCES interest_categories(id) ON DELETE CASCADE,
@@ -226,10 +228,10 @@ SCHEMA = [
         UNIQUE(user_id, interest_id)
     );
     CREATE INDEX IF NOT EXISTS idx_user_interests_user ON user_interests(user_id);
-    CREATE INDEX IF NOT EXISTS idx_user_interests_interest ON user_interests(interest_id);
-    """,
-    """
-    CREATE TABLE IF NOT EXISTS user_pets (
+    CREATE INDEX IF NOT EXISTS idx_user_interests_interest ON user_interests(interest_id);;
+
+-- Migration 16/27
+CREATE TABLE IF NOT EXISTS user_pets (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
         has_dogs BOOLEAN DEFAULT FALSE,
@@ -243,10 +245,10 @@ SCHEMA = [
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
     );
-    CREATE INDEX IF NOT EXISTS idx_user_pets_user ON user_pets(user_id);
-    """,
-    """
-    CREATE TABLE IF NOT EXISTS user_lifestyle (
+    CREATE INDEX IF NOT EXISTS idx_user_pets_user ON user_pets(user_id);;
+
+-- Migration 17/27
+CREATE TABLE IF NOT EXISTS user_lifestyle (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
         smoking TEXT CHECK (smoking IN ('no', 'socially', 'regularly')),
@@ -259,10 +261,10 @@ SCHEMA = [
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
     );
-    CREATE INDEX IF NOT EXISTS idx_user_lifestyle_user ON user_lifestyle(user_id);
-    """,
-    """
-    CREATE TABLE IF NOT EXISTS user_goals (
+    CREATE INDEX IF NOT EXISTS idx_user_lifestyle_user ON user_lifestyle(user_id);;
+
+-- Migration 18/27
+CREATE TABLE IF NOT EXISTS user_goals (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
         wants_kids TEXT CHECK (wants_kids IN ('yes', 'no', 'maybe', 'already_have')),
@@ -274,10 +276,10 @@ SCHEMA = [
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
     );
-    CREATE INDEX IF NOT EXISTS idx_user_goals_user ON user_goals(user_id);
-    """,
-    """
-    CREATE TABLE IF NOT EXISTS user_badges (
+    CREATE INDEX IF NOT EXISTS idx_user_goals_user ON user_goals(user_id);;
+
+-- Migration 19/27
+CREATE TABLE IF NOT EXISTS user_badges (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         badge_type TEXT NOT NULL,
@@ -285,10 +287,10 @@ SCHEMA = [
         UNIQUE(user_id, badge_type)
     );
     CREATE INDEX IF NOT EXISTS idx_user_badges_user ON user_badges(user_id);
-    CREATE INDEX IF NOT EXISTS idx_user_badges_type ON user_badges(badge_type);
-    """,
-    """
-    CREATE TABLE IF NOT EXISTS user_filters (
+    CREATE INDEX IF NOT EXISTS idx_user_badges_type ON user_badges(badge_type);;
+
+-- Migration 20/27
+CREATE TABLE IF NOT EXISTS user_filters (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
         min_age INT DEFAULT 18,
@@ -302,10 +304,10 @@ SCHEMA = [
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
     );
-    CREATE INDEX IF NOT EXISTS idx_user_filters_user ON user_filters(user_id);
-    """,
-    """
-    CREATE TABLE IF NOT EXISTS photo_uploads (
+    CREATE INDEX IF NOT EXISTS idx_user_filters_user ON user_filters(user_id);;
+
+-- Migration 21/27
+CREATE TABLE IF NOT EXISTS photo_uploads (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         storage_path TEXT NOT NULL,
@@ -319,10 +321,10 @@ SCHEMA = [
         updated_at TIMESTAMP DEFAULT NOW()
     );
     CREATE INDEX IF NOT EXISTS idx_photo_uploads_user ON photo_uploads(user_id) WHERE deleted_at IS NULL;
-    CREATE INDEX IF NOT EXISTS idx_photo_uploads_order ON photo_uploads(user_id, photo_order) WHERE deleted_at IS NULL;
-    """,
-    """
-    CREATE TABLE IF NOT EXISTS fraud_flags (
+    CREATE INDEX IF NOT EXISTS idx_photo_uploads_order ON photo_uploads(user_id, photo_order) WHERE deleted_at IS NULL;;
+
+-- Migration 22/27
+CREATE TABLE IF NOT EXISTS fraud_flags (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         flag_type TEXT NOT NULL,
@@ -336,10 +338,10 @@ SCHEMA = [
     );
     CREATE INDEX IF NOT EXISTS idx_fraud_flags_user ON fraud_flags(user_id);
     CREATE INDEX IF NOT EXISTS idx_fraud_flags_severity ON fraud_flags(severity) WHERE resolved_at IS NULL;
-    CREATE INDEX IF NOT EXISTS idx_fraud_flags_created ON fraud_flags(created_at DESC) WHERE resolved_at IS NULL;
-    """,
-    """
-    CREATE TABLE IF NOT EXISTS trust_scores (
+    CREATE INDEX IF NOT EXISTS idx_fraud_flags_created ON fraud_flags(created_at DESC) WHERE resolved_at IS NULL;;
+
+-- Migration 23/27
+CREATE TABLE IF NOT EXISTS trust_scores (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
         overall_score FLOAT DEFAULT 0.5,
@@ -352,10 +354,10 @@ SCHEMA = [
         updated_at TIMESTAMP DEFAULT NOW()
     );
     CREATE INDEX IF NOT EXISTS idx_trust_scores_user ON trust_scores(user_id);
-    CREATE INDEX IF NOT EXISTS idx_trust_scores_overall ON trust_scores(overall_score DESC);
-    """,
-    """
-    CREATE TABLE IF NOT EXISTS account_status (
+    CREATE INDEX IF NOT EXISTS idx_trust_scores_overall ON trust_scores(overall_score DESC);;
+
+-- Migration 24/27
+CREATE TABLE IF NOT EXISTS account_status (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
         is_deactivated BOOLEAN DEFAULT FALSE,
@@ -368,10 +370,10 @@ SCHEMA = [
         updated_at TIMESTAMP DEFAULT NOW()
     );
     CREATE INDEX IF NOT EXISTS idx_account_status_user ON account_status(user_id);
-    CREATE INDEX IF NOT EXISTS idx_account_status_deletion ON account_status(deletion_scheduled_for) WHERE deletion_scheduled_for IS NOT NULL;
-    """,
-    """
-    CREATE TABLE IF NOT EXISTS data_exports (
+    CREATE INDEX IF NOT EXISTS idx_account_status_deletion ON account_status(deletion_scheduled_for) WHERE deletion_scheduled_for IS NOT NULL;;
+
+-- Migration 25/27
+CREATE TABLE IF NOT EXISTS data_exports (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         export_format TEXT CHECK (export_format IN ('json', 'csv')) DEFAULT 'json',
@@ -382,10 +384,10 @@ SCHEMA = [
         created_at TIMESTAMP DEFAULT NOW()
     );
     CREATE INDEX IF NOT EXISTS idx_data_exports_user ON data_exports(user_id);
-    CREATE INDEX IF NOT EXISTS idx_data_exports_expires ON data_exports(expires_at);
-    """,
-    """
-    CREATE TABLE IF NOT EXISTS deletion_audit_log (
+    CREATE INDEX IF NOT EXISTS idx_data_exports_expires ON data_exports(expires_at);;
+
+-- Migration 26/27
+CREATE TABLE IF NOT EXISTS deletion_audit_log (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id UUID NOT NULL,
         admin_id UUID REFERENCES users(id) ON DELETE SET NULL,
@@ -396,10 +398,10 @@ SCHEMA = [
     );
     CREATE INDEX IF NOT EXISTS idx_deletion_audit_user ON deletion_audit_log(user_id);
     CREATE INDEX IF NOT EXISTS idx_deletion_audit_admin ON deletion_audit_log(admin_id);
-    CREATE INDEX IF NOT EXISTS idx_deletion_audit_created ON deletion_audit_log(created_at DESC);
-    """,
-    """
-    CREATE TABLE IF NOT EXISTS user_rewinds (
+    CREATE INDEX IF NOT EXISTS idx_deletion_audit_created ON deletion_audit_log(created_at DESC);;
+
+-- Migration 27/27
+CREATE TABLE IF NOT EXISTS user_rewinds (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         rewound_action_id UUID NOT NULL REFERENCES user_actions(id) ON DELETE CASCADE,
@@ -407,17 +409,5 @@ SCHEMA = [
         UNIQUE(rewound_action_id)
     );
     CREATE INDEX IF NOT EXISTS idx_user_rewinds_user ON user_rewinds(user_id);
-    CREATE INDEX IF NOT EXISTS idx_user_rewinds_created ON user_rewinds(created_at DESC);
-    """,
-]
+    CREATE INDEX IF NOT EXISTS idx_user_rewinds_created ON user_rewinds(created_at DESC);;
 
-def run_migrations():
-    """
-    Migrations disabled - create tables manually in Supabase SQL Editor.
-    Go to: https://app.supabase.com/project/dsxehtlfekmirnvkytka/sql/new
-    Then copy and run the SQL from the SCHEMA array below.
-    """
-    print("📋 Database migrations skipped")
-    print("   ℹ️  To create tables, use Supabase SQL Editor:")
-    print("   https://app.supabase.com/project/dsxehtlfekmirnvkytka/sql/new")
-    print("   Copy the SQL migrations from migrations.py SCHEMA array")
